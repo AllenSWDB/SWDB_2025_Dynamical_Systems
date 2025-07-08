@@ -4,5 +4,22 @@
 	"options": {
 		"registry_host_arg": true,
 		"git_ask_pass": true
+	},
+	"installers": {
+		"pip3": {
+			"packages": [
+				{
+					"name": "aind-behavior-gym"
+				},
+				{
+					"name": "matplotlib"
+				},
+				{
+					"name": "numpy"
+				}
+			],
+			"options": {},
+			"pre_install_options": {}
+		}
 	}
 }
