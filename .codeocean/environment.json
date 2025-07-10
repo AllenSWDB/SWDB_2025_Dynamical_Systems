@@ -1,6 +1,7 @@
 {
 	"version": 1,
 	"base_image": "codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04",
+	"post_install": true,
 	"options": {
 		"registry_host_arg": true,
 		"git_ask_pass": true
@@ -9,13 +10,28 @@
 		"pip3": {
 			"packages": [
 				{
-					"name": "aind-behavior-gym"
+					"name": "aind-behavior-gym",
+					"version": "0.4.3"
 				},
 				{
-					"name": "matplotlib"
+					"name": "matplotlib",
+					"version": "3.9.4"
 				},
 				{
-					"name": "numpy"
+					"name": "numpy",
+					"version": "2.0.2"
+				},
+				{
+					"name": "pandas",
+					"version": "2.3.1"
+				},
+				{
+					"name": "pydantic",
+					"version": "2.11.7"
+				},
+				{
+					"name": "scipy",
+					"version": "1.13.1"
 				}
 			],
 			"options": {},
