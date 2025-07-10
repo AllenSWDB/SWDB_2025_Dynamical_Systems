@@ -1347,6 +1347,8 @@ def negLL(choice_prob, fit_choice_history, fit_reward_history, fit_trial_set=Non
         return -np.sum(np.log(likelihood_each_trial[fit_trial_set]))
 
 
+
+
 class ForagerQLearning(DynamicForagingAgentMLEBase):
     """The familiy of simple Q-learning models."""
 
@@ -2831,6 +2833,101 @@ def plot_foraging_session(  # noqa: C901
 
 
 
+# %%
+from typing import Literal, Tuple, Type
+
+from pydantic import BaseModel, Field
+
+# from .forager_q_learning_params import _add_choice_kernel_fields
+# from .util import create_pydantic_models_dynamic
+
+
+def generate_pydantic_loss_counting_params(
+    win_stay_lose_switch: Literal[False, True] = False,
+    choice_kernel: Literal["none", "one_step", "full"] = "none",
+) -> Tuple[Type[BaseModel], Type[BaseModel]]:
+    """Generate Pydantic models for Loss-counting agent parameters.
+
+    All default values are hard-coded in this function. But when instantiating the model,
+    you can always override the default values, both the params and the fitting bounds.
+
+    Parameters
+    ----------
+    win_stay_lose_switch : bool, optional
+        If True, the agent will be a win-stay-lose-shift agent
+        (loss_count_threshold_mean and loss_count_threshold_std are fixed at 1 and 0),
+        by default False
+    choice_kernel : Literal["none", "one_step", "full"], optional
+        Choice kernel type, by default "none"
+        If "none", no choice kernel will be included in the model.
+        If "one_step", choice_kernel_step_size will be set to 1.0, i.e., only the previous choice
+            affects the choice kernel. (Bari2019)
+        If "full", both choice_kernel_step_size and choice_kernel_relative_weight will be included
+    """
+
+    # ====== Define common fields and constraints ======
+    params_fields = {}
+    fitting_bounds = {}
+
+    # -- Loss counting model parameters --
+    if win_stay_lose_switch:
+        params_fields["loss_count_threshold_mean"] = (
+            float,
+            Field(
+                default=1.0,
+                ge=1.0,
+                le=1.0,
+                frozen=True,  # To indicate that this field is clamped by construction
+                description="Mean of the loss count threshold",
+            ),
+        )
+        fitting_bounds["loss_count_threshold_mean"] = (1.0, 1.0)
+
+        params_fields["loss_count_threshold_std"] = (
+            float,
+            Field(
+                default=0.0,
+                ge=0.0,
+                le=0.0,
+                frozen=True,  # To indicate that this field is clamped by construction
+                description="Std of the loss count threshold",
+            ),
+        )
+        fitting_bounds["loss_count_threshold_std"] = (0.0, 0.0)
+    else:
+        params_fields["loss_count_threshold_mean"] = (
+            float,
+            Field(
+                default=1.0,
+                ge=0.0,
+                description="Mean of the loss count threshold",
+            ),
+        )
+        fitting_bounds["loss_count_threshold_mean"] = (0.0, 10.0)
+
+        params_fields["loss_count_threshold_std"] = (
+            float,
+            Field(
+                default=0.0,
+                ge=0.0,
+                description="Std of the loss count threshold",
+            ),
+        )
+        fitting_bounds["loss_count_threshold_std"] = (0.0, 10.0)
+
+    # -- Always add a bias term --
+    params_fields["biasL"] = (
+        float,
+        Field(default=0.0, ge=-1.0, le=1.0, description="Bias term for loss counting"),
+    )  # Bias term for loss counting directly added to the choice probabilities
+    fitting_bounds["biasL"] = (-1.0, 1.0)
+
+    # -- Add choice kernel fields --
+    _add_choice_kernel_fields(params_fields, fitting_bounds, choice_kernel)
+
+    return create_pydantic_models_dynamic(params_fields, fitting_bounds)
+
+
 def generate_pydantic_q_learning_params(
     number_of_learning_rate: Literal[1, 2] = 2,
     number_of_forget_rate: Literal[0, 1] = 1,
@@ -2985,3 +3082,297 @@ def _add_action_selection_fields(params_fields, fitting_bounds, action_selection
         fitting_bounds["epsilon"] = (0.0, 1.0)
     else:
         raise ValueError("action_selection must be 'softmax' or 'epsilon-greedy'")
+
+
+
+def act_loss_counting(
+    previous_choice: Optional[int],
+    loss_count: int,
+    loss_count_threshold_mean: float,
+    loss_count_threshold_std: float,
+    bias_terms: np.array,
+    choice_kernel=None,
+    choice_kernel_relative_weight=None,
+    rng=None,
+):
+    """Action selection by loss counting method.
+
+    Parameters
+    ----------
+    previous_choice : int
+        Last choice
+    loss_count : int
+        Current loss count
+    loss_count_threshold_mean : float
+        Mean of the loss count threshold
+    loss_count_threshold_std : float
+        Standard deviation of the loss count threshold
+    bias_terms: np.array
+        Bias terms loss count
+    choice_kernel : None or np.array, optional
+        If not None, it will be added to Q-values, by default None
+    choice_kernel_relative_weight : _type_, optional
+        If not None, it controls the relative weight of choice kernel, by default None
+    rng : _type_, optional
+    """
+    rng = rng or np.random.default_rng()
+
+    # -- Return random if this is the first trial --
+    if previous_choice is None:
+        choice_prob = np.array([0.5, 0.5])
+        return choose_ps(choice_prob, rng=rng), choice_prob
+
+    # -- Compute probability of switching --
+    # This cdf trick is equivalent to:
+    #   1) sample a threshold from the normal distribution
+    #   2) compare the threshold with the loss count
+    prob_switch = norm.cdf(
+        loss_count,
+        loss_count_threshold_mean
+        - 1e-10,  # To make sure this is equivalent to ">=" if the threshold is an integer
+        loss_count_threshold_std + 1e-16,  # To make sure this cdf trick works for std=0
+    )
+    choice_prob = np.array([prob_switch, prob_switch])  # Assuming only two choices
+    choice_prob[int(previous_choice)] = 1 - prob_switch
+
+    # -- Add choice kernel --
+    # For a fair comparison with other models that have choice kernel.
+    # However, choice kernel of different families are not directly comparable.
+    # Here, I first compute a normalized choice probability for choice kernel alone using softmax
+    # with inverse temperature 1.0, compute a bias introduced by the choice kernel, and then add
+    # it to the original choice probability.
+    if choice_kernel is not None:
+        choice_prob_choice_kernel = softmax(choice_kernel, rng=rng)
+        bias_L_from_choice_kernel = (
+            choice_prob_choice_kernel[L] - 0.5
+        ) * choice_kernel_relative_weight  # A biasL term introduced by the choice kernel
+        choice_prob[L] += bias_L_from_choice_kernel
+
+    # -- Add global bias --
+    # For a fair comparison with other models that have bias terms.
+    # However, bias terms of different families are not directly comparable.
+    # Here, the bias term is added to the choice probability directly, whereas in other models,
+    # the bias term is added to the Q-values.
+    choice_prob[L] += bias_terms[L]
+
+    # -- Re-normalize choice probability --
+    choice_prob[L] = np.clip(choice_prob[L], 0, 1)
+    choice_prob[R] = 1 - choice_prob[L]
+
+    return choose_ps(choice_prob, rng=rng), choice_prob
+
+
+
+def learn_choice_kernel(choice, choice_kernel_tminus1, choice_kernel_step_size):
+    """Learning function for choice kernel.
+
+    Parameters
+    ----------
+    choice : int
+        this choice
+    choice_kernel_tminus1 : np.ndarray
+        array of old choice kernel values
+    choice_kernel_step_size : float
+        step size for choice kernel
+
+    Returns
+    -------
+    np.ndarray
+        array of new choice kernel values
+    """
+
+    # Choice vector
+    choice_vector = np.array([0, 0])
+    choice_vector[choice] = 1
+
+    # Update choice kernel (see Model 5 of Wilson and Collins, 2019)
+    # Note that if chocie_step_size = 1, degenerates to Bari 2019
+    # (choice kernel = the last choice only)
+    return choice_kernel_tminus1 + choice_kernel_step_size * (choice_vector - choice_kernel_tminus1)
+
+
+def learn_loss_counting(choice, reward, just_switched, loss_count_tminus1) -> int:
+    """Update loss counting
+
+    Returns the new loss count
+    """
+    if reward:
+        return 0
+
+    # If not reward
+    if just_switched:
+        return 1
+    else:
+        return loss_count_tminus1 + 1
+
+
+
+"""Maximum likelihood fitting of foraging models"""
+
+# %%
+from typing import Literal
+
+import numpy as np
+from aind_behavior_gym.dynamic_foraging.task import L, R
+
+
+
+class ForagerLossCounting(DynamicForagingAgentMLEBase):
+    """The familiy of loss counting models."""
+
+    def __init__(
+        self,
+        win_stay_lose_switch: Literal[False, True] = False,
+        choice_kernel: Literal["none", "one_step", "full"] = "none",
+        params: dict = {},
+        **kwargs,
+    ):
+        """Initialize the family of loss counting agents.
+
+        Some special agents are:
+        1. Never switch: loss_count_threshold_mean = inf
+        2. Always switch: loss_count_threshold_mean = 0.0 & loss_count_threshold_std = 0.0
+        3. Win-stay-lose-shift: loss_count_threshold_mean = 1.0 & loss_count_threshold_std = 0.0
+
+        Parameters
+        ----------
+        win_stay_lose_switch: bool, optional
+            If True, the agent will be a win-stay-lose-shift agent
+            (loss_count_threshold_mean and loss_count_threshold_std are fixed at 1 and 0),
+            by default False
+        choice_kernel : Literal["none", "one_step", "full"], optional
+            Choice kernel type, by default "none"
+            If "none", no choice kernel will be included in the model.
+            If "one_step", choice_kernel_step_size will be set to 1.0, i.e., only the last choice
+                affects the choice kernel. (Bari2019)
+            If "full", both choice_kernel_step_size and choice_kernel_relative_weight
+            will be included in fitting
+        params: dict, optional
+            Initial parameters of the model, by default {}.
+            In the loss counting model, the only two parameters are:
+                - loss_count_threshold_mean: float
+                - loss_count_threshold_std: float
+        """
+        # -- Pack the agent_kwargs --
+        self.agent_kwargs = dict(
+            win_stay_lose_switch=win_stay_lose_switch,
+            choice_kernel=choice_kernel,
+        )
+
+        # -- Initialize the model parameters --
+        super().__init__(agent_kwargs=self.agent_kwargs, params=params, **kwargs)
+
+        # -- Some agent-family-specific variables --
+        self.fit_choice_kernel = False
+
+    def _get_params_model(self, agent_kwargs):
+        """Get the params model of the agent"""
+        return generate_pydantic_loss_counting_params(**agent_kwargs)
+
+    def get_agent_alias(self):
+        """Get the agent alias"""
+        _prefix = "WSLS" if self.agent_kwargs["win_stay_lose_switch"] else "LossCounting"
+        _ck = {"none": "", "one_step": "_CK1", "full": "_CKfull"}[
+            self.agent_kwargs["choice_kernel"]
+        ]
+        return _prefix + _ck
+
+    def _reset(self):
+        """Reset the agent"""
+        # --- Call the base class reset ---
+        super()._reset()
+
+        # --- Agent family specific variables ---
+        self.loss_count = np.full(self.n_trials + 1, np.nan)
+        self.loss_count[0] = 0  # Initial loss count as 0
+
+        # Always initialize choice_kernel with nan, even if choice_kernel = "none"
+        self.choice_kernel = np.full([self.n_actions, self.n_trials + 1], np.nan)
+        self.choice_kernel[:, 0] = 0  # Initial choice kernel as 0
+
+    def act(self, _):
+        """Action selection"""
+
+        # Handle choice kernel
+        if self.agent_kwargs["choice_kernel"] == "none":
+            choice_kernel = None
+            choice_kernel_relative_weight = None
+        else:
+            choice_kernel = self.choice_kernel[:, self.trial]
+            choice_kernel_relative_weight = self.params.choice_kernel_relative_weight
+
+        choice, choice_prob = act_loss_counting(
+            previous_choice=self.choice_history[self.trial - 1] if self.trial > 0 else None,
+            loss_count=self.loss_count[self.trial],
+            loss_count_threshold_mean=self.params.loss_count_threshold_mean,
+            loss_count_threshold_std=self.params.loss_count_threshold_std,
+            bias_terms=np.array([self.params.biasL, 0]),
+            # -- Choice kernel --
+            choice_kernel=choice_kernel,
+            choice_kernel_relative_weight=choice_kernel_relative_weight,
+            rng=self.rng,
+        )
+        return choice, choice_prob
+
+    def learn(self, _, choice, reward, __, done):
+        """Update loss counter
+
+        Note that self.trial already increased by 1 before learn() in the base class
+        """
+        self.loss_count[self.trial] = learn_loss_counting(
+            choice=choice,
+            reward=reward,
+            just_switched=(self.trial == 1 or choice != self.choice_history[self.trial - 2]),
+            loss_count_tminus1=self.loss_count[self.trial - 1],
+        )
+
+        # Update choice kernel, if used
+        if self.agent_kwargs["choice_kernel"] != "none":
+            self.choice_kernel[:, self.trial] = learn_choice_kernel(
+                choice=choice,
+                choice_kernel_tminus1=self.choice_kernel[:, self.trial - 1],
+                choice_kernel_step_size=self.params.choice_kernel_step_size,
+            )
+
+    def get_latent_variables(self):
+        return {
+            "loss_count": self.loss_count.tolist(),
+            "choice_kernel": self.choice_kernel.tolist(),
+            "choice_prob": self.choice_prob.tolist(),
+        }
+
+    def plot_latent_variables(self, ax, if_fitted=False):
+        """Plot Q values"""
+        if if_fitted:
+            style = dict(lw=2, ls=":")
+            prefix = "fitted_"
+        else:
+            style = dict(lw=0.5)
+            prefix = ""
+
+        x = np.arange(self.n_trials + 1) + 1  # When plotting, we start from 1
+
+        if not if_fitted:
+            # Only plot loss count if not fitted
+            ax_loss_count = ax.twinx()
+
+            ax_loss_count.plot(x, self.loss_count, label="loss_count", color="blue", **style)
+            ax_loss_count.set(ylabel="Loss count")
+            ax_loss_count.legend(loc="upper right", fontsize=6)
+
+        # Add choice kernel, if used
+        if self.agent_kwargs["choice_kernel"] != "none":
+            ax.plot(
+                x,
+                self.choice_kernel[L, :],
+                label=f"{prefix}choice_kernel(L)",
+                color="purple",
+                **style,
+            )
+            ax.plot(
+                x,
+                self.choice_kernel[R, :],
+                label=f"{prefix}choice_kernel(R)",
+                color="cyan",
+                **style,
+            )
