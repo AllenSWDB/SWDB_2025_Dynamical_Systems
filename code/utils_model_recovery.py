@@ -3707,6 +3707,7 @@ class BanditModel:
                                 (np.round(self.taus,3), np.round(self.w_taus,3))
 
         elif 'RW1972' in forager:
+            print(learn_rate)
             assert all(x is not None for x in (learn_rate,))
             # RW1972 has the same learning rate for rewarded / unrewarded trials
             self.learn_rates = [learn_rate, learn_rate]
@@ -5078,6 +5079,7 @@ def plot_model_comparison_predictive_choice_prob(model_comparison, smooth_factor
     for bb in model_comparison.plot_predictive:
         bb = bb - 1
         if bb < len(model_comparison.results):
+            print(bb)
             this_id = model_comparison.results_sort.index[bb] - 1
             this_choice_prob = model_comparison.results_raw[this_id].predictive_choice_prob
             this_result = model_comparison.results_sort.iloc[bb]
@@ -5406,12 +5408,28 @@ class BanditModelComparison:
                                      pool = pool, if_predictive = True) #plot_predictive is not None)
             
             if if_verbose: print(' AIC = %g, BIC = %g (done in %.3g secs)' % (result_this.AIC, result_this.BIC, time.time()-start) )
-            self.results_raw.append(result_this)
-            self.results = self.results.append(pd.DataFrame({'model': [forager], 'Km': Km, 'AIC': result_this.AIC, 'BIC': result_this.BIC, 
-                                    'LPT_AIC': result_this.LPT_AIC, 'LPT_BIC': result_this.LPT_BIC, 'LPT': result_this.LPT,
-                                    'para_names': [fit_names], 'para_bounds': [fit_bounds], 
-                                    'para_notation': [para_notation], 'para_fitted': [np.round(result_this.x,3)]}, index = [mm+1]))
-        
+            # self.results_raw.append(result_this)
+            # self.results = self.results.append(pd.DataFrame({'model': [forager], 'Km': Km, 'AIC': result_this.AIC, 'BIC': result_this.BIC, 
+            #                         'LPT_AIC': result_this.LPT_AIC, 'LPT_BIC': result_this.LPT_BIC, 'LPT': result_this.LPT,
+            #                         'para_names': [fit_names], 'para_bounds': [fit_bounds], 
+            #                         'para_notation': [para_notation], 'para_fitted': [np.round(result_this.x,3)]}, index = [mm+1]))
+
+            new_row = pd.DataFrame({
+                'model': [forager],
+                'Km': Km,
+                'AIC': result_this.AIC,
+                'BIC': result_this.BIC,
+                'LPT_AIC': result_this.LPT_AIC,
+                'LPT_BIC': result_this.LPT_BIC,
+                'LPT': result_this.LPT,
+                'para_names': [fit_names],
+                'para_bounds': [fit_bounds],
+                'para_notation': [para_notation],
+                'para_fitted': [np.round(result_this.x, 3)]
+            }, index=[mm + 1])
+
+            self.results = pd.concat([self.results, new_row])
+
         # == Reorganize data ==
         delta_AIC = self.results.AIC - np.min(self.results.AIC) 
         delta_BIC = self.results.BIC - np.min(self.results.BIC)
