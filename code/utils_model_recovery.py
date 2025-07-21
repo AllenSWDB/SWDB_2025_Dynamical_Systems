@@ -3311,7 +3311,6 @@ def learn_loss_counting(choice, reward, just_switched, loss_count_tminus1) -> in
 
 # %%
 from typing import Literal
-
 from aind_behavior_gym.dynamic_foraging.task import L, R
 
 
