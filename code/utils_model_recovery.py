@@ -5538,12 +5538,12 @@ def softmax(x, softmax_temperature, bias = 0):
     else:   # Normal softmax
         return np.exp(X)/np.sum(np.exp(X))  # Accept np.
     
-def choose_ps(ps):
-    '''
-    "Poisson"-choice process
-    '''
-    ps = ps/np.sum(ps)
-    return np.max(np.argwhere(np.hstack([-1e-16, np.cumsum(ps)]) < np.random.rand()))
+# def choose_ps(ps):
+#     '''
+#     "Poisson"-choice process
+#     '''
+#     ps = ps/np.sum(ps)
+#     return np.max(np.argwhere(np.hstack([-1e-16, np.cumsum(ps)]) < np.random.rand()))
 
 def seaborn_style():
     """
