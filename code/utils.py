@@ -109,7 +109,7 @@ def plot_FPs(ax, sorted_fps, eig_decomps, D_use, n_interp=20, stability_thresh=1
                         # This calculates how perturbations move through full relaxation dynamics
                         # Compute the overlap between right and left eigenvectors
                         overlap = np.dot(right_dots, left_dots.T)
-                        print(overlap)
+                        # print(overlap)
                         # Calculate the start and end points for the expansion line
                         start_points = projected_fp - rf * overlap * right_dots
                         end_points = projected_fp + rf * overlap * right_dots
