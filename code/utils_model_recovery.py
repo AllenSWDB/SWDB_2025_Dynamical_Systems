@@ -5051,7 +5051,7 @@ def plot_session_lightweight(fake_data, fitted_data = None, smooth_factor = 5, b
     
     # For each session, if any
     if fitted_data is not None:
-        ax.plot(np.arange(0, n_trials), fitted_data[1,:], linewidth = 1.5, label = 'model') 
+        ax.plot(np.arange(0, n_trials+1), fitted_data[1,:], linewidth = 1.5, label = 'model') 
 
     ax.legend(fontsize = 10, loc=1, bbox_to_anchor=(0.985, 0.89), bbox_transform=plt.gcf().transFigure)
      
