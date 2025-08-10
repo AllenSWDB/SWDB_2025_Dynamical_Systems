@@ -3706,7 +3706,6 @@ class BanditModel:
                                 (np.round(self.taus,3), np.round(self.w_taus,3))
 
         elif 'RW1972' in forager:
-            print(learn_rate)
             assert all(x is not None for x in (learn_rate,))
             # RW1972 has the same learning rate for rewarded / unrewarded trials
             self.learn_rates = [learn_rate, learn_rate]
@@ -4805,12 +4804,6 @@ def cross_validate_bandit(forager, fit_names, fit_bounds, choice_history, reward
 
 
 
-def moving_average(a, n=3) :
-    ret = np.nancumsum(a, dtype=float)
-    ret[n:] = ret[n:] - ret[:-n]
-    return ret[n - 1:] / n
-
-
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 import seaborn as sns
@@ -5045,8 +5038,8 @@ def plot_session_lightweight(fake_data, fitted_data = None, smooth_factor = 5, b
     x = np.arange(0, len(y)) + int(smooth_factor/2)
 
 
-    print('the shape of x is ', x.shape)
-    print('the shape of y is ', y.shape)
+#     print('the shape of x is ', x.shape)
+#     print('the shape of y is ', y.shape)
     ax.plot(x, y, linewidth = 1.5, color='black', label = 'choice (smooth = %g)' % smooth_factor)
     
     # For each session, if any
@@ -5078,7 +5071,6 @@ def plot_model_comparison_predictive_choice_prob(model_comparison, smooth_factor
     for bb in model_comparison.plot_predictive:
         bb = bb - 1
         if bb < len(model_comparison.results):
-            print(bb)
             this_id = model_comparison.results_sort.index[bb] - 1
             this_choice_prob = model_comparison.results_raw[this_id].predictive_choice_prob
             this_result = model_comparison.results_sort.iloc[bb]
@@ -5554,10 +5546,6 @@ def seaborn_style():
     matplotlib.rcParams['pdf.fonttype'] = 42
     matplotlib.rcParams['ps.fonttype'] = 42
     
-def moving_average(a, n=3) :
-    ret = np.nancumsum(a, dtype=float)
-    ret[n:] = ret[n:] - ret[:-n]
-    return ret[n - 1:] / n
 
 
 def fit_sigmoid_p_choice(p_reward, choice, win=10, stepsize=None):
