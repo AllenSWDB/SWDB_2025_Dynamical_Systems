@@ -23,6 +23,12 @@ from typing import List, Optional
 import numpy as np
 from pydantic import BaseModel, field_validator, model_validator
 
+import contextlib
+class DummyFile(object):
+    def write(self, x): pass
+    def flush(self): pass
+
+
 
 def callback_history(x, **kargs):
     '''
@@ -3706,7 +3712,6 @@ class BanditModel:
                                 (np.round(self.taus,3), np.round(self.w_taus,3))
 
         elif 'RW1972' in forager:
-            print(learn_rate)
             assert all(x is not None for x in (learn_rate,))
             # RW1972 has the same learning rate for rewarded / unrewarded trials
             self.learn_rates = [learn_rate, learn_rate]
@@ -5078,12 +5083,11 @@ def plot_model_comparison_predictive_choice_prob(model_comparison, smooth_factor
     for bb in model_comparison.plot_predictive:
         bb = bb - 1
         if bb < len(model_comparison.results):
-            print(bb)
             this_id = model_comparison.results_sort.index[bb] - 1
             this_choice_prob = model_comparison.results_raw[this_id].predictive_choice_prob
             this_result = model_comparison.results_sort.iloc[bb]
            
-            ax.plot(np.arange(0, n_trials), this_choice_prob[1,:] , linewidth = max(1.5-0.3*bb,0.2), 
+            ax.plot(np.arange(0, n_trials+1), this_choice_prob[1,:] , linewidth = max(1.5-0.3*bb,0.2), 
                     label = 'Model %g: %s, Km = %g\n%s\n%s' % (bb+1, this_result.model, this_result.Km, 
                                                                                         this_result.para_notation, this_result.para_fitted))
     
@@ -5178,7 +5182,7 @@ def plot_model_comparison_result(model_comparison):
     for rr, raw in enumerate(model_comparison.results_raw):
         this_predictive_choice_prob = raw.predictive_choice_prob
         this_predictive_choice = np.argmax(this_predictive_choice_prob, axis = 0)
-        prediction_accuracy_NONCV[rr] = np.sum(this_predictive_choice == model_comparison.fit_choice_history) / model_comparison.n_trials
+        prediction_accuracy_NONCV[rr] = np.sum(this_predictive_choice[1:] == model_comparison.fit_choice_history[0,:]) / model_comparison.n_trials
         
     results['prediction_accuracy_NONCV'] = prediction_accuracy_NONCV * 100
 
@@ -5407,7 +5411,7 @@ class BanditModelComparison:
                                      pool = pool, if_predictive = True) #plot_predictive is not None)
             
             if if_verbose: print(' AIC = %g, BIC = %g (done in %.3g secs)' % (result_this.AIC, result_this.BIC, time.time()-start) )
-            # self.results_raw.append(result_this)
+            self.results_raw.append(result_this)
             # self.results = self.results.append(pd.DataFrame({'model': [forager], 'Km': Km, 'AIC': result_this.AIC, 'BIC': result_this.BIC, 
             #                         'LPT_AIC': result_this.LPT_AIC, 'LPT_BIC': result_this.LPT_BIC, 'LPT': result_this.LPT,
             #                         'para_names': [fit_names], 'para_bounds': [fit_bounds], 
@@ -5634,15 +5638,14 @@ def fit_para_recovery(forager, para_names, para_bounds, true_paras = None, n_mod
             for pp in range(n_paras):
                 true_paras_this.append(np.random.uniform(para_bounds[0][pp], para_bounds[1][pp]))
             true_paras[:,n] = true_paras_this
-            
-        # Generate fake data
+
         choice_history, reward_history, _ = generate_fake_data(forager, para_names, true_paras[:,n], **{'n_trials': n_trials,**kwargs})
-            
-        # Predictive fitting
-        fitting_result = fit_bandit(forager, para_names, para_bounds, choice_history, reward_history, fit_method = fit_method, DE_pop_size = DE_pop_size, n_x0s = n_x0s, pool = pool)
+        fitting_result = fit_bandit(
+            forager, para_names, para_bounds, choice_history, reward_history,
+            fit_method=fit_method, DE_pop_size=DE_pop_size, n_x0s=n_x0s, pool=pool)
         fitted_paras[:,n] = fitting_result.x
     
-        # print(true_paras_this, fitting_result.x)
+            # print(true_paras_this, fitting_result.x)
         
     # === Plot results ===
     if fit_method == 'DE':
@@ -5865,3 +5868,5 @@ def generate_random_para(forager, para_name):
             return np.random.uniform(-5, 5)
     return np.nan    
     
+
+# %%
