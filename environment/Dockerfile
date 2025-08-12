@@ -1,4 +1,4 @@
-# hash:sha256:793fb077b591ab308e9262c88a70eaa4b31a08c9da401bc58235c0177364cb54
+# hash:sha256:e9027c640ce457c35da859a252b2156aae42872172bcbd4d6d29882d8dd5a6da
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
 
@@ -14,7 +14,9 @@ RUN pip3 install -U --no-cache-dir \
     numpy==2.0.2 \
     pandas==2.3.1 \
     pydantic==2.11.7 \
-    scipy==1.13.1
+    scipy==1.13.1 \
+    seaborn==0.13.2 \
+    statsmodels==0.14.5
 
 COPY postInstall /
 RUN /postInstall
