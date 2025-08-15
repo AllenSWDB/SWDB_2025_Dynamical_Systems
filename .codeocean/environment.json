@@ -22,6 +22,10 @@
 					"version": "0.12.0"
 				},
 				{
+					"name": "imageio",
+					"version": "2.37.0"
+				},
+				{
 					"name": "matplotlib",
 					"version": "3.9.4"
 				},
