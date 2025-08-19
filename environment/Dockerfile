@@ -1,4 +1,4 @@
-# hash:sha256:d48f40e1279ddef1e1985ae6b9bda0f15d9efed74616487f86752652c3b61900
+# hash:sha256:4bed2489e12b80a4b7122f01eaa793242e5707618130843566e09ba51da7028b
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
 
@@ -12,6 +12,7 @@ RUN pip3 install -U --no-cache-dir \
     aind-analysis-arch-result-access==0.7.2 \
     aind-behavior-gym==0.4.3 \
     aind-dynamic-foraging-models==0.12.0 \
+    hdmf-zarr \
     imageio==2.37.0 \
     matplotlib==3.9.4 \
     numpy==2.0.2 \

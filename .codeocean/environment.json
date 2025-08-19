@@ -22,6 +22,9 @@
 					"version": "0.12.0"
 				},
 				{
+					"name": "hdmf-zarr"
+				},
+				{
 					"name": "imageio",
 					"version": "2.37.0"
 				},

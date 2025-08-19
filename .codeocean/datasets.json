@@ -2,6 +2,10 @@
 	"version": 1,
 	"attached_datasets": [
 		{
+			"id": "5b660c71-795e-442a-a405-69775f34b6fe",
+			"mount": "Reads"
+		},
+		{
 			"id": "f908dd4d-d7ed-4d52-97cf-ccd0e167c659",
 			"mount": "foraging_nwb_bonsai"
 		}
