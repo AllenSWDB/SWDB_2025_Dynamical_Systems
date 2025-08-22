@@ -65,8 +65,7 @@ SWDB_2025_Dynamical_Systems/
 ```
 
 ## 📚 Further Links
-- [SWDB Day3 GitHub](https://github.com/AllenSWDB/SWDB_2025_Dynamical_Systems)
-- [SWDB 2025 wiki](https://github.com/AllenInstitute/swdb_2025_student/wiki)
+- [SWDB 2025 Dynamical Systems GitHub Repo](https://github.com/AllenSWDB/SWDB_2025_Dynamical_Systems)
 
 ---
 

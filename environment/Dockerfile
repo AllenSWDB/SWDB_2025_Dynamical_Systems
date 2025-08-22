@@ -1,18 +1,16 @@
-# hash:sha256:4bed2489e12b80a4b7122f01eaa793242e5707618130843566e09ba51da7028b
+# hash:sha256:5c6a11deb1d40e55f6704c812cdcff435241594cfc259a0d1a8f362c675c036c
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
 
 ARG DEBIAN_FRONTEND=noninteractive
-
 ARG GIT_ASKPASS
-ARG GIT_ACCESS_TOKEN
 COPY git-askpass /
 
 RUN pip3 install -U --no-cache-dir \
     aind-analysis-arch-result-access==0.7.2 \
     aind-behavior-gym==0.4.3 \
     aind-dynamic-foraging-models==0.12.0 \
-    hdmf-zarr \
+    hdmf-zarr==0.11.3 \
     imageio==2.37.0 \
     matplotlib==3.9.4 \
     numpy==2.0.2 \
